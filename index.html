@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>简单定投</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+  <main class="app-shell">
+    <aside class="sidebar" aria-label="账户概览">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">简</div>
+        <div>
+          <h1>简单定投</h1>
+          <p>把规则写在前面，把情绪挡在外面。</p>
+        </div>
+      </div>
+
+      <section class="panel">
+        <h2>资金设置</h2>
+
+        <label>
+          当前可用于投资的金额
+          <input id="availableCash" type="number" min="0" step="100" />
+        </label>
+        <div class="summary-row">
+          <span>当前持仓总金额</span>
+          <strong id="accountValueSummary">--</strong>
+          <p>由基金清单里的“持仓金额”自动汇总，不需要重复填写。</p>
+        </div>
+        <div class="summary-row slim" style="margin-top: 14px;">
+          <span>核心仓目标金额 <em id="coreTargetNote" style="font-style: normal; color: var(--muted);">（70%）</em></span>
+          <strong id="coreTarget">--</strong>
+          <p style="margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55;">已持仓 <strong id="coreHolding" style="font-size: 13px; color: var(--green);">--</strong></p>
+        </div>
+        <div class="summary-row slim" style="margin-top: 14px;">
+          <span>卫星仓目标金额 <em id="satelliteTargetNote" style="font-style: normal; color: var(--muted);">（30%）</em></span>
+          <strong id="satelliteTarget">--</strong>
+          <p style="margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55;">已持仓 <strong id="satelliteHolding" style="font-size: 13px; color: var(--gold);">--</strong></p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 style="margin-bottom: 12px;">仓位比例与再平衡</h2>
+        <div class="donut-wrap" style="margin-bottom: 16px;">
+          <canvas id="allocationChart" width="200" height="200" aria-label="仓位比例图"></canvas>
+          <div class="donut-center">
+            <strong id="allocationRatio">--</strong>
+            <span>当前比例</span>
+          </div>
+        </div>
+        <div id="rebalanceAdvice" class="rebalance-box"></div>
+        <div style="margin-top: 16px;">
+          <label>
+            年度再平衡月份
+            <select id="rebalanceMonth">
+              <option value="0">1 月</option>
+              <option value="1">2 月</option>
+              <option value="2">3 月</option>
+              <option value="3">4 月</option>
+              <option value="4">5 月</option>
+              <option value="5">6 月</option>
+              <option value="6">7 月</option>
+              <option value="7">8 月</option>
+              <option value="8">9 月</option>
+              <option value="9">10 月</option>
+              <option value="10">11 月</option>
+              <option value="11">12 月</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <details class="panel rule-panel">
+        <summary>
+          <span>规则设置</span>
+          <em>低频调整</em>
+        </summary>
+        <div class="rule-settings">
+          <h4 style="margin-bottom: 8px;">全局规则</h4>
+          <div class="rule-group" style="display: grid; gap: 16px;">
+            <label>
+              定投周期
+              <span class="input-suffix">
+                <input id="dcaCycleDays" type="number" min="1" max="365" step="1" />
+                <em>天</em>
+              </span>
+            </label>
+            <label>
+              建议定投步数
+              <span class="input-suffix">
+                <input id="dcaBatches" type="number" min="1" max="100" step="1" />
+                <em>步</em>
+              </span>
+            </label>
+          </div>
+
+          <h4 style="margin-top: 24px; margin-bottom: 8px;">核心仓规则</h4>
+          <div class="rule-group" style="display: grid; gap: 16px;">
+            <label>
+              核心仓比例
+              <span class="input-suffix">
+                <input id="coreRatio" type="number" min="1" max="99" step="1" />
+                <em>%</em>
+              </span>
+            </label>
+            <label>
+              核心拉满线
+              <span class="input-suffix">
+                <input id="coreFullBelow" type="number" min="0" max="100" step="1" />
+                <em>%</em>
+              </span>
+            </label>
+            <label>
+              核心半仓区间下限
+              <span class="input-suffix">
+                <input id="coreHalfLow" type="number" min="0" max="100" step="1" />
+                <em>%</em>
+              </span>
+            </label>
+            <label>
+              核心半仓区间上限
+              <span class="input-suffix">
+                <input id="coreHalfHigh" type="number" min="0" max="100" step="1" />
+                <em>%</em>
+              </span>
+            </label>
+            <label>
+              核心止盈线
+              <span class="input-suffix">
+                <input id="coreSellAbove" type="number" min="0" max="100" step="1" />
+                <em>%</em>
+              </span>
+            </label>
+            <label>
+              核心止盈比例
+              <span class="input-suffix">
+                <input id="coreSellPercent" type="number" min="1" max="100" step="1" />
+                <em>%</em>
+              </span>
+            </label>
+          </div>
+
+          <h4 style="margin-top: 24px; margin-bottom: 8px;">卫星仓规则</h4>
+          <div class="rule-group" style="display: grid; gap: 16px;">
+            <div class="summary-row slim">
+              <span>卫星仓比例</span>
+              <strong id="satelliteRatioSummary">--</strong>
+            </div>
+            <label>
+              卫星买入线
+              <span class="input-suffix">
+                <input id="satelliteBuyBelow" type="number" min="0" max="100" step="1" />
+                <em>%</em>
+              </span>
+            </label>
+            <label>
+              卫星卖一半线
+              <span class="input-suffix">
+                <input id="satelliteSellHalfAbove" type="number" min="0" max="100" step="1" />
+                <em>%</em>
+              </span>
+            </label>
+            <label>
+              卫星清仓线
+              <span class="input-suffix">
+                <input id="satelliteClearAbove" type="number" min="0" max="100" step="1" />
+                <em>%</em>
+              </span>
+            </label>
+          </div>
+        </div>
+        <button id="resetRulesButton" class="ghost-button full-button" type="button">恢复默认规则</button>
+      </details>
+
+      <div class="data-management" style="margin-top: auto; padding-top: 24px; border-top: 1px solid var(--border-color);">
+        <p class="eyebrow" style="margin-bottom: 8px; padding: 0 16px;">数据管理</p>
+        <div style="padding: 0 16px; display: grid; gap: 8px;">
+          <button id="exportDataButton" class="ghost-button full-button" style="text-align: center;">导出数据备份</button>
+          <button id="importDataButton" class="ghost-button full-button" style="text-align: center;">导入数据备份</button>
+          <input type="file" id="importFileInput" style="display: none;" accept=".json" />
+        </div>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">规则驾驶舱</p>
+          <h2>下一步怎么做</h2>
+        </div>
+      </header>
+
+
+
+      <section class="layout-grid">
+        <div class="main-column">
+          <section class="section-block">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">操作建议</p>
+                <h3>下一步动作</h3>
+              </div>
+              <button id="undoButton" class="ghost-button" type="button" onclick="undoAction()" style="display: none;">撤回上一步</button>
+            </div>
+            <div id="actionList" class="action-list"></div>
+          </section>
+
+          <section class="section-block">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">基金清单</p>
+                <h3>持仓与估值</h3>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button id="refreshValuationButton" class="ghost-button" type="button">刷新估值</button>
+                <button id="addFundButton" class="primary-button" type="button">添加基金</button>
+              </div>
+            </div>
+            <p class="section-note">
+              用户只需要填写持仓金额；PE 百分位会优先从免费公开数据源自动匹配，匹配不到时再手动填。
+            </p>
+            <div id="valuationNotice" class="notice-box"></div>
+            <div id="fundList" class="fund-list"></div>
+          </section>
+        </div>
+
+
+      </section>
+    </section>
+  </main>
+
+  <template id="fundTemplate">
+    <article class="fund-card">
+      <div class="fund-card-head">
+        <label>
+          基金名称 / 代码
+          <input data-field="name" type="text" />
+        </label>
+        <label>
+          跟踪指数
+          <select data-field="indexCode" data-role="indexSelect"></select>
+        </label>
+        <label>
+          仓位类型
+          <select data-field="bucket">
+            <option value="core">核心底仓</option>
+            <option value="satellite">卫星弹性仓</option>
+          </select>
+        </label>
+        <button class="icon-button" data-action="remove" type="button" aria-label="删除基金">×</button>
+      </div>
+      <div class="fund-fields">
+        <label>
+          持仓金额
+          <input data-field="value" type="number" min="0" step="10" />
+          <span class="field-help">从基金账户复制持仓金额。</span>
+        </label>
+        <label>
+          PE 百分位
+          <span class="input-suffix">
+            <input data-field="pe" type="number" min="0" max="100" step="1" />
+            <em>%</em>
+          </span>
+          <span class="field-help">自动带出，可手动修正。</span>
+        </label>
+      </div>
+      <div class="fund-result" data-role="fundResult"></div>
+    </article>
+  </template>
+
+  <script src="./app.js"></script>
+</body>
+
+</html>
