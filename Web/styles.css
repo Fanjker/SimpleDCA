@@ -68,15 +68,12 @@ button {
   margin-bottom: 28px;
 }
 
-.brand-mark {
-  display: grid;
+.brand-logo {
   width: 48px;
   height: 48px;
-  place-items: center;
+  object-fit: cover;
   border-radius: 12px;
-  background: var(--ink);
-  color: #fff;
-  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .brand h1,
@@ -704,4 +701,72 @@ select:focus {
   .icon-button {
     width: 100%;
   }
+}
+
+/* 帮助提示样式 */
+.label-help {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  cursor: help;
+  vertical-align: middle;
+}
+
+.label-help-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  font-style: normal;
+  transition: all 0.2s ease;
+}
+
+.label-help:hover .label-help-icon {
+  background: var(--green);
+  color: #fff;
+}
+
+.label-help-text {
+  visibility: hidden;
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  width: 200px;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.label-help-text::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: var(--ink) transparent transparent transparent;
+}
+
+.label-help:hover .label-help-text {
+  visibility: visible;
+  opacity: 1;
+  transform: translateX(-50%) translateY(-5px);
 }

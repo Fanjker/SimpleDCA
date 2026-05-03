@@ -782,7 +782,23 @@ function bindEvents() {
   els.resetRulesButton.addEventListener("click", resetRules);
 
   els.exportDataButton.addEventListener("click", () => {
-    const data = JSON.stringify(state, null, 2);
+    // 导出前进行数据瘦身，只保留用户数据
+    const backup = structuredClone(state);
+
+    // 移除自动获取的、具有时效性的估值库数据
+    delete backup.valuations;
+    delete backup.valuationUpdatedAt;
+
+    // 移除基金中自动同步的 PE 百分位（导入时会根据 indexCode 重新抓取）
+    if (Array.isArray(backup.funds)) {
+      backup.funds.forEach((fund) => {
+        if (fund.indexCode !== "manual") {
+          delete fund.pe;
+        }
+      });
+    }
+
+    const data = JSON.stringify(backup, null, 2);
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
