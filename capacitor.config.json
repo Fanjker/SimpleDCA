@@ -1,6 +1,6 @@
 {
   "appId": "com.simpledca.app",
-  "appName": "简单定投",
+  "appName": "SimpleDCA",
   "webDir": "Web",
   "plugins": {
     "StatusBar": {
