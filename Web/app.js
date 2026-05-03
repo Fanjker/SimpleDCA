@@ -1,3 +1,26 @@
+/**
+ * 移动端 Tab 切换逻辑
+ */
+function switchTab(tabId) {
+  // 1. 设置全局 active-tab 属性（由 CSS 控制显隐和动画）
+  document.body.dataset.activeTab = tabId;
+
+  // 2. 切换底部导航状态
+  const navItems = document.querySelectorAll('.nav-item');
+  const tabList = ['overview', 'actions', 'funds', 'settings'];
+  
+  navItems.forEach((item, index) => {
+    if (tabList[index] === tabId) {
+      item.classList.add('active');
+    } else {
+      item.classList.remove('active');
+    }
+  });
+
+  // 3. 切换后回到顶部
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 const STORAGE_KEY = "simple-dca-state-v4";
 const LEGACY_STORAGE_KEY = "simple-dca-state-v3";
 const VALUATION_SOURCE_URL =
@@ -649,7 +672,11 @@ function updateFund(id, key, value, node) {
 }
 
 function removeFund(id) {
-  state.funds = state.funds.filter((fund) => fund.id !== id);
+  const fund = state.funds.find(f => f.id === id);
+  const fundName = fund ? (fund.name || "未命名基金") : "该基金";
+  if (!confirm(`确定要删除“${fundName}”吗？删除后相关持仓数据将无法恢复。`)) return;
+
+  state.funds = state.funds.filter((f) => f.id !== id);
   saveState();
   render();
 }
@@ -784,21 +811,27 @@ function bindEvents() {
   els.exportDataButton.addEventListener("click", () => {
     // 导出前进行数据瘦身，只保留用户数据
     const backup = structuredClone(state);
-
-    // 移除自动获取的、具有时效性的估值库数据
     delete backup.valuations;
     delete backup.valuationUpdatedAt;
-
-    // 移除基金中自动同步的 PE 百分位（导入时会根据 indexCode 重新抓取）
     if (Array.isArray(backup.funds)) {
       backup.funds.forEach((fund) => {
-        if (fund.indexCode !== "manual") {
-          delete fund.pe;
-        }
+        if (fund.indexCode !== "manual") delete fund.pe;
       });
     }
 
     const data = JSON.stringify(backup, null, 2);
+    const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    if (isMobile && navigator.clipboard) {
+      navigator.clipboard.writeText(data).then(() => {
+        alert("✅ 数据已复制到剪贴板！\n请粘贴并保存至您的备忘录或安全的地方。");
+      }).catch(() => fallbackDownload(data));
+    } else {
+      fallbackDownload(data);
+    }
+  });
+
+  function fallbackDownload(data) {
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -806,10 +839,29 @@ function bindEvents() {
     a.download = `simple-dca-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  });
+  }
 
   els.importDataButton.addEventListener("click", () => {
-    els.importFileInput.click();
+    const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      const input = prompt("请在此粘贴您的备份数据文本 (JSON)：");
+      if (input) {
+         try {
+            const imported = JSON.parse(input);
+            if (!imported.funds || !imported.rules) throw new Error("Invalid format");
+            if (confirm("⚠️ 导入备份将覆盖当前所有持仓及规则设置，确定吗？")) {
+              state = imported;
+              saveState();
+              location.reload();
+            }
+         } catch(e) {
+            alert("❌ 导入失败：数据格式不正确");
+         }
+      }
+    } else {
+      els.importFileInput.click();
+    }
   });
 
   els.importFileInput.addEventListener("change", (e) => {
