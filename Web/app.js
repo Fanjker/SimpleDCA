@@ -8,7 +8,7 @@ function switchTab(tabId) {
   // 2. 切换底部导航状态
   const navItems = document.querySelectorAll('.nav-item');
   const tabList = ['overview', 'actions', 'funds', 'settings'];
-  
+
   navItems.forEach((item, index) => {
     if (tabList[index] === tabId) {
       item.classList.add('active');
@@ -155,6 +155,7 @@ function normalizeFund(fund) {
     bucket: fund.bucket === "satellite" ? "satellite" : "core",
     pe: toNumber(fund.pe),
     value: toNumber(fund.value),
+    lastActionDate: fund.lastActionDate || null,
   };
 }
 
@@ -471,7 +472,7 @@ function renderActions() {
           </div>
           <p>${advice.detail}</p>
           ${advice.type === "buy" || advice.type === "sell"
-          ? `<button class="ghost-button" style="margin-top: 12px; width: fit-content; padding: 6px 12px; font-size: 13px;" onclick="executeAction('${advice.fundId}', '${advice.type}', ${advice.amount})">确认执行已操作</button>`
+          ? `<button class="ghost-button" style="margin-top: 12px; width: fit-content; padding: 6px 12px; font-size: 13px;" onclick="executeAction('${advice.fundId}', '${advice.type}', ${advice.amount})">确认已执行该操作</button>`
           : ""
         }
         </article>
@@ -553,14 +554,28 @@ function drawDonut(core, satellite) {
   const canvas = els.allocationChart;
   const ctx = canvas.getContext("2d");
   const total = core + satellite;
-  const center = canvas.width / 2;
-  const radius = 84;
-  const width = 24;
+
+  // 优化高清屏锯齿
+  const dpr = window.devicePixelRatio || 1;
+  const logicalWidth = 200;
+  const logicalHeight = 200;
+
+  if (canvas.width !== logicalWidth * dpr) {
+    canvas.width = logicalWidth * dpr;
+    canvas.height = logicalHeight * dpr;
+    canvas.style.width = `${logicalWidth}px`;
+    canvas.style.height = `${logicalHeight}px`;
+  }
+
+  const center = (logicalWidth * dpr) / 2;
+  const radius = 84 * dpr;
+  const width = 24 * dpr;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.lineWidth = width;
   ctx.lineCap = "round";
 
+  // 背景圆环
   ctx.beginPath();
   ctx.strokeStyle = "#e6e1d5";
   ctx.arc(center, center, radius, 0, Math.PI * 2);
@@ -571,13 +586,16 @@ function drawDonut(core, satellite) {
   const start = -Math.PI / 2;
   const coreEnd = start + Math.PI * 2 * (core / total);
 
+  // 核心仓
   ctx.beginPath();
   ctx.strokeStyle = "#147c64";
   ctx.arc(center, center, radius, start, coreEnd);
   ctx.stroke();
 
+  // 卫星仓
   ctx.beginPath();
   ctx.strokeStyle = "#bc8420";
+  // 增加微小间隙避免视觉粘连
   ctx.arc(center, center, radius, coreEnd + 0.04, start + Math.PI * 2 - 0.04);
   ctx.stroke();
 }
@@ -775,10 +793,12 @@ function bindEvents() {
 
     if (type === "buy") {
       fund.value += Math.round(amount);
-      fund.lastActionDate = Date.now();
     } else if (type === "sell") {
       fund.value = Math.max(0, fund.value - Math.round(amount));
     }
+
+    // 统一更新最后操作日期，防止短期内重复提醒
+    fund.lastActionDate = Date.now();
 
     saveState();
     render();
@@ -848,21 +868,21 @@ function bindEvents() {
 
   els.importDataButton.addEventListener("click", () => {
     const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
+
     if (isMobile) {
       const input = prompt("请在此粘贴您的备份数据文本 (JSON)：");
       if (input) {
-         try {
-            const imported = JSON.parse(input);
-            if (!imported.funds || !imported.rules) throw new Error("Invalid format");
-            if (confirm("⚠️ 导入备份将覆盖当前所有持仓及规则设置，确定吗？")) {
-              state = imported;
-              saveState();
-              location.reload();
-            }
-         } catch(e) {
-            alert("❌ 导入失败：数据格式不正确");
-         }
+        try {
+          const imported = JSON.parse(input);
+          if (!imported.funds || !imported.rules) throw new Error("Invalid format");
+          if (confirm("⚠️ 导入备份将覆盖当前所有持仓及规则设置，确定吗？")) {
+            state = imported;
+            saveState();
+            location.reload();
+          }
+        } catch (e) {
+          alert("❌ 导入失败：数据格式不正确");
+        }
       }
     } else {
       els.importFileInput.click();
@@ -911,15 +931,15 @@ function renderHistory() {
   }
 
   els.historySection.style.display = "";
-  
+
   // 只显示最近 10 条记录
   const sortedHistory = [...state.actionHistory].reverse().slice(0, 10);
-  
+
   els.historyTimeline.innerHTML = sortedHistory.map(item => {
     const date = new Date(item.timestamp);
     const timeStr = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
     const typeLabel = item.type === "buy" ? "买入" : "卖出";
-    
+
     return `
       <div class="timeline-item ${item.type}">
         <div class="timeline-content">
