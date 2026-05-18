@@ -433,12 +433,17 @@ function buyAdvice(fund, amount, cashLimit, detail) {
       // 计算原始定投日，然后调整到交易日
       const rawNextDate = new Date(fund.lastActionDate + state.rules.dcaCycleDays * 24 * 3600 * 1000);
       const nextDate = adjustToTradingDay(rawNextDate);
-      const daysLeft = Math.max(1, Math.ceil((nextDate.getTime() - Date.now()) / (1000 * 3600 * 24)));
 
-      // 如果调整后的交易日已经过去或就是今天，不再等待
-      if (nextDate.getTime() <= Date.now()) {
-        // 定投日已到，直接给出买入建议
+      // 按日期（年月日）比较，忽略时间部分，避免同一天因时间差异误判
+      const today = new Date();
+      const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const nextDateOnly = new Date(nextDate.getFullYear(), nextDate.getMonth(), nextDate.getDate());
+
+      // 如果今天已经是定投日或已过定投日，直接给出买入建议
+      if (todayDate.getTime() >= nextDateOnly.getTime()) {
+        // 定投日已到，跳过等待，进入下方的买入建议
       } else {
+        const daysLeft = Math.ceil((nextDateOnly.getTime() - todayDate.getTime()) / (1000 * 3600 * 24));
         const dateStr = `${nextDate.getMonth() + 1}月${nextDate.getDate()}日`;
         const wasAdjusted = rawNextDate.getTime() !== nextDate.getTime();
         const adjustNote = wasAdjusted ? `（原定 ${rawNextDate.getMonth() + 1}月${rawNextDate.getDate()}日为非交易日，已提前）` : '';
