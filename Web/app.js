@@ -989,7 +989,7 @@ function bindEvents() {
       const amountInput = form.querySelector('[data-edit="amount"]');
 
       const newTimestamp = new Date(timestampInput.value).getTime();
-      const newAmount = Math.max(0, Math.round(toNumber(amountInput.value)));
+      const newAmount = Math.max(0, Math.round(toNumber(amountInput.value) * 100) / 100);
 
       if (!Number.isFinite(newTimestamp) || newTimestamp <= 0) {
         alert('请输入有效的操作时间。');
@@ -1012,7 +1012,7 @@ function bindEvents() {
       if (!record) return;
 
       const typeLabel = record.type === 'buy' ? '买入' : '卖出';
-      if (!confirm(`确定要删除"${typeLabel} ${record.fundName} ${moneyRound(record.amount)}"这条记录吗？\n删除后持仓金额会相应回退。`)) return;
+      if (!confirm(`确定要删除"${typeLabel} ${record.fundName} ${money(record.amount)}"这条记录吗？\n删除后持仓金额会相应回退。`)) return;
 
       // 移除该记录
       state.actionHistory.splice(index, 1);
@@ -1203,7 +1203,7 @@ function renderHistory() {
             <div class="timeline-info">
               <span class="timeline-time">${timeStr}</span>
               <div class="timeline-title">${typeLabel} ${item.fundName}</div>
-              <div class="timeline-desc">金额：<strong>${moneyRound(item.amount)}</strong></div>
+              <div class="timeline-desc">金额：<strong>${money(item.amount)}</strong></div>
             </div>
             <div class="timeline-actions">
               <button class="timeline-edit-btn" data-action="edit" data-index="${realIndex}" title="编辑">✏️</button>
@@ -1218,7 +1218,7 @@ function renderHistory() {
             </label>
             <label class="timeline-field">
               <span>操作金额</span>
-              <input type="number" class="timeline-input" data-edit="amount" min="0" step="1" value="${item.amount}" />
+              <input type="number" class="timeline-input" data-edit="amount" min="0" step="0.01" value="${item.amount}" />
             </label>
             <div class="timeline-edit-buttons">
               <button class="ghost-button action-btn" data-action="save" data-index="${realIndex}">保存</button>
