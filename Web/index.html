@@ -208,6 +208,16 @@
             <h2>数据管理</h2>
           </div>
           <p class="eyebrow pc-only" style="margin-bottom: 8px; padding: 0 16px;">数据管理</p>
+          <div style="padding: 0 16px; margin-bottom: 16px;">
+            <label>
+              <div class="label-row">
+                自定义估值代理 API (可选)
+                <span class="label-help"><i class="label-help-icon">?</i><span
+                    class="label-help-text">在公共代理均失效时，可填写您自建的跨域代理地址进行数据刷新。</span></span>
+              </div>
+              <input id="customProxyUrl" type="url" placeholder="如：https://your-worker.workers.dev" style="margin-top: 4px;" />
+            </label>
+          </div>
           <div style="padding: 0 16px; display: grid; gap: 12px;">
             <button id="exportDataButton" class="ghost-button full-button" style="text-align: center;">导出数据备份</button>
             <button id="importDataButton" class="ghost-button full-button" style="text-align: center;">导入数据备份</button>

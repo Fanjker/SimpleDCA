@@ -51,8 +51,45 @@ function switchTab(tabId) {
 
 const STORAGE_KEY = "simple-dca-state-v4";
 const LEGACY_STORAGE_KEY = "simple-dca-state-v3";
-const VALUATION_SOURCE_URL =
-  "https://api.codetabs.com/v1/proxy/?quest=https://danjuanfunds.com/djapi/index_eva/dj?size=200";
+const VALUATION_TARGET = "https://danjuanfunds.com/djapi/index_eva/dj?size=200";
+
+/**
+ * 根据运行环境获取可用的估值 API 及代理 URL 候选列表
+ */
+function getValuationUrls() {
+  const urls = [];
+
+  // 如果用户在设置中配置了自定义代理地址，优先加入列表中进行尝试
+  if (state && state.customProxyUrl && state.customProxyUrl.trim()) {
+    let proxy = state.customProxyUrl.trim();
+    // 自动补齐协议前缀
+    if (!proxy.startsWith("http://") && !proxy.startsWith("https://")) {
+      proxy = "https://" + proxy;
+    }
+    // 依据代理 URL 格式拼接目标估值接口
+    if (proxy.includes("?")) {
+      urls.push(`${proxy}${encodeURIComponent(VALUATION_TARGET)}`);
+    } else {
+      // 兼容支持 /url 和 ?url= 两种最常见的代理路径格式
+      urls.push(`${proxy}/${VALUATION_TARGET}`);
+      urls.push(`${proxy}?url=${encodeURIComponent(VALUATION_TARGET)}`);
+    }
+  }
+
+  // 原生 App 环境下，优先添加直连方式（不带跨域代理）
+  if (isCapacitorNative()) {
+    urls.push(VALUATION_TARGET);
+  }
+
+  // 默认公共的跨域代理服务器列表
+  urls.push(
+    `https://corsproxy.io/?${VALUATION_TARGET}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(VALUATION_TARGET)}`,
+    `` + `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(VALUATION_TARGET)}`
+  );
+
+  return urls;
+}
 
 const defaultRules = {
   dcaCycleDays: 7,
@@ -79,6 +116,7 @@ const defaultState = {
   rules: structuredClone(defaultRules),
   valuationUpdatedAt: "",
   valuations: structuredClone(fallbackValuations),
+  customProxyUrl: "",
   funds: [
     {
       id: crypto.randomUUID(),
@@ -125,6 +163,7 @@ const els = {
   importFileInput: document.querySelector("#importFileInput"),
   refreshValuationButton: document.querySelector("#refreshValuationButton"),
   valuationNotice: document.querySelector("#valuationNotice"),
+  customProxyUrl: document.querySelector("#customProxyUrl"),
   coreTarget: document.querySelector("#coreTarget"),
   coreTargetNote: document.querySelector("#coreTargetNote"),
   coreHolding: document.querySelector("#coreHolding"),
@@ -497,6 +536,7 @@ function holdAdvice(fund, detail, tags = ["持有", bucketName(fund.bucket)]) {
 function renderInputs() {
   els.availableCash.value = state.availableCash;
   els.rebalanceMonth.value = state.rebalanceMonth;
+  els.customProxyUrl.value = state.customProxyUrl || "";
   Object.keys(defaultRules).forEach((key) => {
     els[key].value = state.rules[key];
   });
@@ -890,45 +930,77 @@ async function refreshValuations() {
   els.valuationNotice.className = "notice-box";
   els.valuationNotice.textContent = "正在刷新公开估值数据...";
 
-  try {
-    const response = await fetch(VALUATION_SOURCE_URL, { cache: "no-store" });
-    if (!response.ok) throw new Error("数据源响应异常");
-    const json = await response.json();
+  const urls = getValuationUrls();
+  let lastError = null;
 
-    if (!json || !json.data || !json.data.items || json.data.items.length === 0) {
-      throw new Error("未解析到估值数据");
-    }
+  for (const url of urls) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 设置 8 秒请求超时限制
 
-    const fresh = json.data.items.map((item) => ({
-      code: item.index_code.replace(/^[A-Za-z]+(?=\d)/, ""),
-      name: item.name,
-      pe: toNumber(item.pe),
-      pePercentile: toNumber(item.pe_percentile) * 100,
-      source: "蛋卷基金",
-    }));
+    try {
+      const response = await fetch(url, { 
+        cache: "no-store",
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
 
-    const uniqueFresh = [];
-    const seen = new Set();
-    for (const item of fresh) {
-      if (!seen.has(item.code)) {
-        seen.add(item.code);
-        uniqueFresh.push(item);
+      if (!response.ok) {
+        throw new Error(`HTTP 状态码异常: ${response.status}`);
       }
-    }
 
-    state.valuations = mergeValuations(uniqueFresh);
-    syncIndexOptions(state.valuations);
-    state.valuationUpdatedAt = new Date().toISOString();
-    state.funds.forEach((fund) => {
-      if (fund.indexCode !== "manual") syncFundPeFromIndex(fund);
-    });
-    saveState();
-    render();
-  } catch (err) {
-    console.error(err);
-    els.valuationNotice.className = "notice-box warning";
-    els.valuationNotice.textContent = "公开估值数据获取失败，未配置内置估值表，如 PE 百分位不准确请手动修正。";
+      const json = await response.json();
+      let dataJson = json;
+
+      // 兼容某些代理返回包裹内容（如 allorigins 的 contents 字段）
+      if (json && typeof json === "object" && json.contents) {
+        try {
+          dataJson = JSON.parse(json.contents);
+        } catch (e) {
+          throw new Error("解析代理包裹内容失败");
+        }
+      }
+
+      if (!dataJson || !dataJson.data || !dataJson.data.items || dataJson.data.items.length === 0) {
+        throw new Error("未解析到有效的估值数据");
+      }
+
+      const fresh = dataJson.data.items.map((item) => ({
+        code: item.index_code.replace(/^[A-Za-z]+(?=\d)/, ""),
+        name: item.name,
+        pe: toNumber(item.pe),
+        pePercentile: toNumber(item.pe_percentile) * 100,
+        source: "蛋卷基金",
+      }));
+
+      const uniqueFresh = [];
+      const seen = new Set();
+      for (const item of fresh) {
+        if (!seen.has(item.code)) {
+          seen.add(item.code);
+          uniqueFresh.push(item);
+        }
+      }
+
+      state.valuations = mergeValuations(uniqueFresh);
+      syncIndexOptions(state.valuations);
+      state.valuationUpdatedAt = new Date().toISOString();
+      state.funds.forEach((fund) => {
+        if (fund.indexCode !== "manual") syncFundPeFromIndex(fund);
+      });
+      saveState();
+      render();
+      return; // 获取成功，直接提前终止函数
+    } catch (err) {
+      clearTimeout(timeoutId);
+      console.warn(`估值数据源请求失败，尝试备用数据源 (${url}):`, err);
+      lastError = err;
+    }
   }
+
+  // 所有代理均宣告失败时的兜底逻辑
+  console.error("所有公开估值数据源获取失败:", lastError);
+  els.valuationNotice.className = "notice-box warning";
+  els.valuationNotice.textContent = "公开估值数据获取失败，已自动使用内置估值表；如 PE 百分位不准确，请手动修正。";
 }
 
 function mergeValuations(fresh) {
@@ -1076,6 +1148,11 @@ function bindEvents() {
 
   Object.keys(defaultRules).forEach((key) => {
     els[key].addEventListener("input", () => updateRule(key, els[key].value));
+  });
+
+  els.customProxyUrl.addEventListener("input", () => {
+    state.customProxyUrl = els.customProxyUrl.value.trim();
+    saveState();
   });
 
   els.addFundButton.addEventListener("click", addFund);

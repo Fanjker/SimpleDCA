@@ -4,7 +4,7 @@
   "description": "Simple Investment DCA Tool",
   "main": "app.js",
   "scripts": {
-    "sync": "npx cap copy android",
+    "sync": "npx cap sync android",
     "open-android": "npx cap open android",
     "web": "npx serve Web"
   },

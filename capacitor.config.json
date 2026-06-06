@@ -6,6 +6,9 @@
     "StatusBar": {
       "backgroundColor": "#18201f",
       "style": "DARK"
+    },
+    "CapacitorHttp": {
+      "enabled": true
     }
   }
 }
